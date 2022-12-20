@@ -1,35 +1,34 @@
+#include <ctime>
 #include <iostream>
-#include <boost/array.hpp>
+#include <string>
 #include <boost/asio.hpp>
 
 using boost::asio::ip::tcp;
 
-int main(int argc, char* argv[])
+std::string make_daytime_string()
+{
+  using namespace std; // For time_t, time and ctime;
+  time_t now = time(0);
+  return ctime(&now);
+}
+
+int main()
 {
   try
   {
     boost::asio::io_context io_context;
-
-    tcp::resolver resolver(io_context);
-    tcp::resolver::results_type endpoints =
-      resolver.resolve("localhost", "daytime");
-
-    tcp::socket socket(io_context);
-    boost::asio::connect(socket, endpoints);
+    tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), 13));
 
     for (;;)
     {
-      boost::array<char, 128> buf;
-      boost::system::error_code error;
+      tcp::socket socket(io_context);
+      // blocks until a new connection is from a peer
+      acceptor.accept(socket);
 
-      size_t len = socket.read_some(boost::asio::buffer(buf), error);
+      std::string message = make_daytime_string();
 
-      if (error == boost::asio::error::eof)
-        break; // Connection closed cleanly by peer.
-      else if (error)
-        throw boost::system::system_error(error); // Some other error.
-
-      std::cout.write(buf.data(), len);
+      boost::system::error_code ignored_error;
+      boost::asio::write(socket, boost::asio::buffer(message), ignored_error);
     }
   }
   catch (std::exception& e)
